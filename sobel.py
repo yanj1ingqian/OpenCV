@@ -1,9 +1,10 @@
 import cv2 
 import numpy as np
 
-img = cv2.imread("input/02.jpg")
+img = cv2.imread("input/03.jpg", cv2.IMREAD_GRAYSCALE).astype(np.float32)
 if img is None:
     print("读图失败")
+    exit()
 print(img.shape,img.dtype,img.size)
 
 d = [[x,y] for x in range(-1,2) for y in range(-1,2)]
@@ -11,7 +12,7 @@ d = [[x,y] for x in range(-1,2) for y in range(-1,2)]
 def gauss(img):
     H, W = img.shape
     pad = np.pad(img, 1, mode='edge')
-    out = np.zeros_like(img) 
+    out = np.zeros_like(img, dtype=np.float32) 
     k = [1,2,1,
         2,4,2,
         1,2,1]
@@ -25,7 +26,7 @@ def gauss(img):
 def sobel_x(img):
     H, W = img.shape
     pad = np.pad(img, 1, mode='edge')
-    out = np.zeros_like(img)
+    out = np.zeros_like(img, dtype=np.float32)
     k = [-1,0,1,
          -2,0,2,
          -1,0,1]
@@ -41,7 +42,7 @@ def sobel_x(img):
 def sobel_y(img):
     H, W = img.shape
     pad = np.pad(img, 1, mode='edge')
-    out = np.zeros_like(img)
+    out = np.zeros_like(img, dtype=np.float32)
     k = [-1,-2,-1,
          0,0,0,
          1,2,1]
@@ -59,14 +60,14 @@ def sobel_mag(grad_x,grad_y):
     return grad_mag
 
 def sobel_angle(grad_x,grad_y):
-    out = np.zeros_like(grad_x)
+    out = np.zeros_like(grad_x, dtype=np.float32)
     theta = np.arctan2(grad_y,grad_x) 
     angle = np.degrees(theta)%360
     angle_u8 = (angle / 360*255.0).astype(np.uint8)
     out = cv2.applyColorMap(angle_u8,cv2.COLORMAP_JET)
     return out
-    
-gray = gauss(gray)
+
+gray = gauss(img)
 grad_x = sobel_x(gray)
 grad_y = sobel_y(gray)
 grad_mag = sobel_mag(grad_x,grad_y)
