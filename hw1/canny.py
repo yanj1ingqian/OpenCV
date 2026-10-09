@@ -1,3 +1,3 @@
 import cv2 
 import numpy as np
-import sobel
+from hw1.sobel import *
