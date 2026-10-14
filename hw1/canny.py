@@ -6,11 +6,7 @@ from sobel import *
 T1 = 0.15
 T2 = 0.05
 
-img = cv2.imread("hw1/input/02.jpg", cv2.IMREAD_GRAYSCALE)
-if img is None:
-    print("读图失败")
-    exit()
-img = img.astype(np.float32)
+
 
 def canny(img):
     H,W = img.shape
@@ -60,7 +56,13 @@ def canny(img):
     out = np.zeros((H, W), dtype=np.uint8)
     out[label == STRONG] = 255   
     return out
+if __name__ == "__main__":  
+    img = cv2.imread("hw1/input/02.jpg", cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        print("读图失败")
+        exit()
 
-img_canny= canny(img)
-img_canny = cv2.normalize(img_canny, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-cv2.imwrite("hw1/output/canny.png",img_canny)
+    img = img.astype(np.float32)
+    img_canny= canny(img)
+    img_canny = cv2.normalize(img_canny, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    cv2.imwrite("hw1/output/canny.png",img_canny)
