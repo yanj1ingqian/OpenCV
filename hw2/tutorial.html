@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作业2 · 边看边做：SIFT 匹配与图像拼接</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --paper: #fff; --ink: #211e1a; --body: #3a3530;
+    --muted: #7a7166; --line: #e7e1d6; --accent: #b0442a;
+    --accent-soft: #fbf0ec; --blue: #1f6b86; --blue-soft: #edf5f8;
+    --green: #2f6b4f; --green-soft: #eef6f1;
+    --code-bg: #1b1f26; --code-bar: #242a33;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--body);
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 16.5px; line-height: 1.85; -webkit-font-smoothing: antialiased;
+  }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent), #d98b3a); z-index: 100; }
+
+  .hero { background: var(--paper); border-bottom: 1px solid var(--line);
+    padding: 64px 32px 52px; position: relative; overflow: hidden; }
+  .hero::after { content: ""; position: absolute; right: -120px; top: -120px;
+    width: 400px; height: 400px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(176,68,42,.09), transparent 68%); }
+  .hero-inner { max-width: 1120px; margin: 0 auto; position: relative; }
+  .eyebrow { display: inline-block; font-size: 12.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 16px; }
+  .hero h1 { margin: 0 0 16px; font-size: clamp(27px, 4vw, 43px); line-height: 1.3;
+    font-weight: 750; color: var(--ink); letter-spacing: -.01em; }
+  .hero p.lead { margin: 0; max-width: 720px; font-size: 17px; color: var(--muted); }
+  .meta { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { font-size: 13px; padding: 5px 13px; border-radius: 999px;
+    background: #f2eee6; color: #5c5449; border: 1px solid var(--line); }
+
+  .shell { max-width: 1120px; margin: 0 auto; padding: 0 32px 100px;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 64px; }
+  nav.toc { position: sticky; top: 24px; align-self: start; padding-top: 48px;
+    font-size: 13.5px; max-height: calc(100vh - 48px); overflow-y: auto; }
+  nav.toc .toc-title { font-size: 11.5px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--muted); font-weight: 700; margin-bottom: 12px; }
+  nav.toc a { display: block; padding: 5px 0 5px 13px; color: #6c645a;
+    text-decoration: none; border-left: 2px solid transparent; line-height: 1.5; }
+  nav.toc a:hover { color: var(--ink); }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent);
+    background: linear-gradient(90deg, var(--accent-soft), transparent); font-weight: 600; }
+
+  main { padding-top: 48px; max-width: 800px; min-width: 0; }
+  section { scroll-margin-top: 24px; margin-bottom: 68px; }
+  h2 { font-size: 25px; line-height: 1.4; color: var(--ink); font-weight: 700;
+    margin: 0 0 20px; display: flex; align-items: baseline; gap: 13px; }
+  h2 .num { font-family: var(--mono); font-size: 15px; font-weight: 600;
+    color: var(--accent); flex: none; }
+  h3 { font-size: 18.5px; color: var(--ink); font-weight: 650; margin: 32px 0 12px; }
+  h4 { font-size: 15.5px; color: #4a443c; font-weight: 650; margin: 24px 0 8px; }
+  p { margin: 0 0 16px; }
+  strong { color: var(--ink); font-weight: 650; }
+  em { font-style: normal; background: linear-gradient(transparent 62%, #f6e2c8 62%); }
+  ul, ol { margin: 0 0 18px; padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--accent); }
+  code.inline { font-family: var(--mono); font-size: .875em; background: #f2eee7;
+    color: #8a3b26; padding: 2px 6px; border-radius: 4px; border: 1px solid #eae3d7; }
+
+  .code { margin: 20px 0 24px; border-radius: 10px; overflow: hidden;
+    background: var(--code-bg); box-shadow: 0 2px 10px rgba(30,24,16,.10); }
+  .code-bar { display: flex; align-items: center; justify-content: space-between;
+    background: var(--code-bar); padding: 8px 14px; border-bottom: 1px solid #2f3742; }
+  .code-bar .lang { font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: #8b97a6; }
+  .code-bar .name { font-family: var(--mono); font-size: 12px; color: #5f6b7a; margin-left: 10px; }
+  .code-bar .hint { font-family: system-ui, sans-serif; font-size: 12px;
+    color: #c8a882; letter-spacing: 0; text-transform: none; margin-left: 10px; }
+  .copy-btn { font-family: system-ui, sans-serif; font-size: 11.5px; background: transparent;
+    color: #8b97a6; border: 1px solid #39424f; border-radius: 5px; padding: 3px 10px;
+    cursor: pointer; }
+  .copy-btn:hover { color: #dfe6ee; border-color: #56616f; }
+  .copy-btn.done { color: #7fd1a4; border-color: #3f6b52; }
+  pre { margin: 0; padding: 17px 20px 19px; overflow-x: auto; max-height: 700px;
+    overflow-y: auto; font-family: var(--mono); font-size: 13.2px; line-height: 1.7;
+    color: #cdd6e0; }
+  pre::-webkit-scrollbar { width: 10px; height: 10px; }
+  pre::-webkit-scrollbar-thumb { background: #39424f; border-radius: 5px; }
+  .t-com { color: #5f6f80; font-style: italic; }
+  .t-str { color: #9ecf8a; }
+  .t-kw { color: #e08fa0; }
+  .t-num { color: #e5b86e; }
+  .t-fn { color: #7fb8dc; }
+
+  .callout { margin: 20px 0; padding: 15px 19px 15px 18px; border-radius: 0 8px 8px 0;
+    border-left: 3px solid var(--blue); background: var(--blue-soft); font-size: 15.5px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; margin-bottom: 5px; color: var(--blue); }
+  .callout.warn { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout.warn .tag { color: var(--accent); }
+  .callout.ok { border-left-color: var(--green); background: var(--green-soft); }
+  .callout.ok .tag { color: var(--green); }
+
+  .table-wrap { overflow-x: auto; margin: 20px 0 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th { text-align: left; font-weight: 650; color: var(--ink); background: #f6f2ea;
+    padding: 10px 13px; border-bottom: 1px solid var(--line); font-size: 13.5px; white-space: nowrap; }
+  td { padding: 9px 13px; border-bottom: 1px solid #f0ebe1; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fcfaf6; }
+  td code { font-family: var(--mono); font-size: .88em; color: #8a3b26; }
+
+  .eq { margin: 20px 0; padding: 16px; text-align: center;
+    font-family: "Cambria", Georgia, serif; font-size: 17.5px; color: var(--ink);
+    background: #fcfaf5; border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+  .eq .var { font-style: italic; }
+  .eq .note { display: block; margin-top: 8px; font-family: system-ui, sans-serif;
+    font-size: 13px; color: var(--muted); }
+  .eq code { font-family: var(--mono); font-size: 12.5px; color: #8a3b26; }
+  .frac { display: inline-block; vertical-align: middle; text-align: center; margin: 0 4px; }
+  .frac .num { display: block; padding: 0 8px 3px; border-bottom: 1px solid #6c645a; }
+  .frac .den { display: block; padding: 3px 8px 0; }
+  .matrix { display: inline-grid; grid-template-columns: repeat(3, auto); gap: 3px 14px;
+    vertical-align: middle; padding: 4px 12px; position: relative;
+    font-family: "Cambria", Georgia, serif; font-style: italic; }
+  .matrix::before, .matrix::after { content: ""; position: absolute; top: 0; bottom: 0;
+    width: 7px; border: 1.5px solid #6c645a; }
+  .matrix::before { left: 0; border-right: none; border-radius: 3px 0 0 3px; }
+  .matrix::after { right: 0; border-left: none; border-radius: 0 3px 3px 0; }
+  .matrix span { text-align: center; }
+  .deriv { counter-reset: dv; list-style: none; padding-left: 0; margin: 18px 0 22px; }
+  .deriv > li { counter-increment: dv; position: relative; padding-left: 34px; margin-bottom: 15px; }
+  .deriv > li::before { content: "(" counter(dv) ")"; position: absolute; left: 0; top: 1px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
+
+  .timeline { margin: 22px 0 26px; border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; background: var(--paper); }
+  .timeline .row { display: grid; grid-template-columns: 112px 1fr; gap: 16px;
+    padding: 12px 18px; border-bottom: 1px solid #f0ebe1; align-items: baseline; }
+  .timeline .row:last-child { border-bottom: none; }
+  .timeline .t { font-family: var(--mono); font-size: 12.5px; color: var(--accent); font-weight: 600; }
+  .timeline .d { font-size: 14.5px; }
+  .timeline .d b { color: var(--ink); }
+
+  .steps { counter-reset: st; list-style: none; padding-left: 0; margin: 20px 0; }
+  .steps > li { counter-increment: st; position: relative; padding-left: 38px; margin-bottom: 13px; }
+  .steps > li::before { content: counter(st); position: absolute; left: 0; top: 2px;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff;
+    font-size: 12.5px; font-weight: 700; display: flex; align-items: center;
+    justify-content: center; font-family: var(--mono); }
+
+  .checkpoint { margin: 22px 0; padding: 16px 20px; border: 1px dashed #b9a988;
+    border-radius: 10px; background: #fdfaf2; }
+  .checkpoint .tag { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: #8a6a2f; margin-bottom: 8px; }
+  .checkpoint p:last-child { margin-bottom: 0; }
+
+  .end { margin-top: 70px; padding-top: 26px; border-top: 1px solid var(--line);
+    font-size: 14px; color: var(--muted); }
+
+  @media (max-width: 980px) {
+    .shell { grid-template-columns: 1fr; gap: 0; padding: 0 22px 80px; }
+    nav.toc { display: none; } main { padding-top: 36px; }
+    .hero { padding: 48px 22px 40px; }
+  }
+  @media (max-width: 560px) {
+    body { font-size: 16px; } h2 { font-size: 21px; }
+    pre { font-size: 12.3px; padding: 14px; }
+    .timeline .row { grid-template-columns: 1fr; gap: 2px; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">OpenCV 课程 · 作业 2 · 边看边做</span>
+    <h1>边看边做：SIFT 匹配<br>与单应矩阵图像拼接</h1>
+    <p class="lead">每一章 = <strong>一段原理推导 + 一小段你自己敲的代码 + 当场验证</strong>。没有整份可复制的源码，跟着四步把 <code class="inline">stitch.py</code> 一点点写出来；公式推导完整保留，最后有一页速查表可直接抄进报告。</p>
+    <div class="meta">
+      <span class="chip">约 3.5 小时</span>
+      <span class="chip">4 段代码，边做边跑</span>
+      <span class="chip">公式推导完整</span>
+      <span class="chip">不调用 findHomography</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc">
+    <div class="toc-title">目录</div>
+    <a href="#s0">0 · 怎么安排 / 规则</a>
+    <a href="#s1">1 · 准备：新建空文件</a>
+    <a href="#s2">2 · 第 1 步：SIFT + 匹配</a>
+    <a href="#s3">3 · 第 2 步：DLT 求解器</a>
+    <a href="#s4">4 · 第 3 步：RANSAC 求 H</a>
+    <a href="#s5">5 · 第 4 步：拼接与融合</a>
+    <a href="#s6">6 · 调参与验收</a>
+    <a href="#s7">7 · 公式速查（写报告用）</a>
+  </nav>
+
+  <main>
+
+    <!-- 0 -->
+    <section id="s0">
+      <h2><span class="num">00</span>怎么安排 / 规则</h2>
+
+      <div class="timeline">
+        <div class="row"><span class="t">0:00–0:10</span><span class="d"><b>准备</b>：装库、放图、新建空 <code class="inline">stitch.py</code></span></div>
+        <div class="row"><span class="t">0:10–0:45</span><span class="d"><b>第 1 步</b>：读图、SIFT、ratio 匹配 → 打印点数</span></div>
+        <div class="row"><span class="t">0:45–1:45</span><span class="d"><b>第 2 步</b>：看 DLT 推导，写三个函数 → 四点误差验证</span></div>
+        <div class="row"><span class="t">1:45–2:45</span><span class="d"><b>第 3 步</b>：看 RANSAC 推导，写一个函数 → 打印内点率</span></div>
+        <div class="row"><span class="t">2:45–3:20</span><span class="d"><b>第 4 步</b>：包围盒 + warp + 羽化融合 → 出两张图</span></div>
+        <div class="row"><span class="t">3:20–3:40</span><span class="d"><b>收尾</b>：调参、截图、照抄第 7 章公式进报告</span></div>
+      </div>
+
+      <div class="callout warn">
+        <span class="tag">唯一红线</span>
+        <p>全程<strong>不要出现</strong> <code class="inline">cv2.findHomography</code>、<code class="inline">cv2.Stitcher</code>、<code class="inline">estimateAffine*</code>。哪怕只是"验证一下"也别留在提交的文件里。<strong>手写部分是"用 RANSAC 求 H"这一整套</strong>：DLT 只当内层的 4 点求解器，最终交付的 H 必须来自 RANSAC 的内点重算，其余都可以调库。</p>
+      </div>
+
+      <h3>这版教程怎么用</h3>
+      <p>代码<strong>按四步分开给</strong>，每步只有十几到三十行，照着自己敲进 <code class="inline">stitch.py</code>。每章末尾有一个<strong>验证点</strong>：跑一次、看到预期输出，再往下走。这样某一步错了马上知道错在哪，不用对着一百多行代码找 bug。</p>
+      <p><code class="inline">stitch.py</code> 写成<strong>顺序执行的脚本</strong>（不用 <code class="inline">main()</code>、不用 <code class="inline">if __name__</code>），所以每一步只要"追加到文件末尾"即可，前面写的不用回头改。</p>
+
+      <h3>公式推导不能跳</h3>
+      <p>报告要写原理，下面这些完整推导全部保留：<strong>单应矩阵如何从平面约束推出、DLT 怎么把投影式线性化、SVD 为什么取 <code class="inline">Vt[-1]</code>、归一化与反归一化、RANSAC 迭代次数公式</strong>。它们放在对应步骤的"原理"小节里，边写边懂；第 7 章另有一页速查表，写报告时直接抄。</p>
+
+      <div class="callout ok">
+        <span class="tag">写代码 / 写报告分开</span>
+        <p><strong>动手</strong>：跟着第 2~5 章的代码块敲。<strong>报告的原理部分</strong>：抄第 2.1 / 3.1~3.5 / 4.2~4.3 的推导，或直接用第 7 章速查表。两件事互不占用时间，一下午仍然够。</p>
+      </div>
+
+      <h3>真正可以跳过的</h3>
+      <p>只砍实现细节与进阶优化，不砍任何推导：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>跳过</th><th>为什么</th></tr></thead>
+          <tbody>
+            <tr><td>crossCheck、FLANN、KD-Tree</td><td>几千个点，暴力匹配几秒跑完</td></tr>
+            <tr><td>LM 非线性精化的代码实现</td><td>内点重算已够；报告里点一句"DLT 最小化代数误差"即可（见 3.6）</td></tr>
+            <tr><td>多频段融合、最佳缝合线搜索</td><td>距离变换羽化已能消掉硬边（见 5.3），作业不要求这类高级融合</td></tr>
+            <tr><td>自适应迭代的代码实现</td><td>代码固定 3000 次够用；<strong>但 4.3 的公式推导要写进报告</strong></td></tr>
+            <tr><td>描述子 4×4×8 构造细节</td><td>只需知道输出是 128 维向量</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>要交的东西</h3>
+      <ol>
+        <li><code class="inline">stitch.py</code>：自己一步步敲出来的脚本</li>
+        <li>匹配连线图 <code class="inline">out/inliers.png</code>、拼接结果 <code class="inline">out/stitched.jpg</code></li>
+        <li>三个数字：特征点数、ratio 后匹配数、RANSAC 内点率</li>
+        <li>公式推导（第 7 章）</li>
+      </ol>
+    </section>
+
+    <!-- 1 -->
+    <section id="s1">
+      <h2><span class="num">01</span>准备：新建空文件（10 分钟）</h2>
+
+      <div class="code">
+        <div class="code-bar"><span class="lang">bash</span><button class="copy-btn">复制</button></div>
+        <pre data-lang="text">python -c "import cv2; print(cv2.__version__)"
+pip install opencv-python numpy</pre>
+      </div>
+
+      <p>两张图拍<strong>同一块校牌</strong>，视角差 20°~40°，长边 1000~2000 像素，保留彩色（程序里自动转灰度送 SIFT）。目录长这样：</p>
+
+      <div class="code">
+        <div class="code-bar"><span class="lang">text</span><button class="copy-btn">复制</button></div>
+        <pre data-lang="text">hw2/
+├─ left.jpg      图 1（会被变换）
+├─ right.jpg     图 2（作为基准，不动）
+└─ stitch.py     ← 现在新建，先留空</pre>
+      </div>
+
+      <p>现在打开编辑器，新建 <code class="inline">stitch.py</code>，<strong>先只敲这三行</strong>：</p>
+
+      <div class="code">
+        <div class="code-bar"><span class="lang">python</span><span class="name">stitch.py · 起始 3 行</span><span class="hint">自己敲，别复制整份</span><button class="copy-btn">复制</button></div>
+        <pre data-lang="python" data-build="1">import os
+import cv2
+import numpy as np
+</pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="tag">路径坑</span>
+        <p><code class="inline">cv2.imread("left.jpg")</code> 认的是<strong>当前工作目录</strong>，不是脚本所在目录。从别处启动会读到 <code class="inline">None</code>，然后 SIFT 报 <em>image is empty</em>。所以第 1 步的代码里统一用 <code class="inline">os.path.dirname(os.path.abspath(__file__))</code> 拼绝对路径——照着敲就没事。运行时也建议先 <code class="inline">cd</code> 到 <code class="inline">hw2</code>。</p>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="s2">
+      <h2><span class="num">02</span>第 1 步：读图、SIFT、匹配</h2>
+
+      <h3>2.1 原理：描述子与 ratio 判据</h3>
+
+      <p>SIFT 给每个关键点生成一个 128 维描述子 <em>a</em>，相似度用欧氏距离：</p>
+      <div class="eq">
+        <span class="var">d</span>(<span class="var">a</span>, <span class="var">b</span>) =
+        ‖<span class="var">a</span> − <span class="var">b</span>‖<sub>2</sub> =
+        <span style="font-size:24px; vertical-align:middle">√</span><span style="border-top:1.5px solid #6c645a; padding:0 6px 0 2px">
+          <span class="var">Σ</span><sub><span class="var">k</span>=1</sub><sup>128</sup> (<span class="var">a</span><sub><span class="var">k</span></sub> − <span class="var">b</span><sub><span class="var">k</span></sub>)<sup>2</sup>
+        </span>
+        <span class="note">描述子范数实测约 512，距离落在几百量级，所以<strong>绝对阈值不可用</strong></span>
+      </div>
+
+      <p>匹配不能用"取最近的一个"：那样每个点都会被强行配上对象，实测 4002 个点返回 4002 对，一大半是错的。取最近 <em>d</em><sub>1</sub> 与次近 <em>d</em><sub>2</sub>，用 Lowe 的 NNDR 判据：</p>
+      <div class="eq">
+        <span class="frac"><span class="num"><span class="var">d</span><sub>1</sub></span><span class="den"><span class="var">d</span><sub>2</sub></span></span>
+        &lt; 0.75
+        <span class="note">正确匹配的特征是唯一的 → 比值小；重复纹理（栏杆、白墙）两个候选一样像 → 比值趋近 1，被剔除。比值无量纲，光照变化不影响它</span>
+      </div>
+      <p>同一对参考图实测：0.6 / 0.7 / 0.75 / 0.8 / 0.9 分别保留 653 / 899 / <strong>1067</strong> / 1277 / 2030 对。默认 0.75。</p>
+
+      <h3>2.2 动手：把下面这段追加到文件末尾</h3>
+
+      <div class="code">
+        <div class="code-bar"><span class="lang">python</span><span class="name">第 1 段 · 追加到 stitch.py</span><span class="hint">约 18 行</span><button class="copy-btn">复制</button></div>
+        <pre data-lang="python" data-build="1">
+BASE = os.path.dirname(os.path.abspath(__file__))
+img1 = cv2.imread(os.path.join(BASE, "left.jpg"))
+img2 = cv2.imread(os.path.join(BASE, "right.jpg"))
+assert img1 is not None and img2 is not None, "读图失败"
+g1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+g2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+sift = cv2.SIFT_create()
+kp1, des1 = sift.detectAndCompute(g1, None)
+kp2, des2 = sift.detectAndCompute(g2, None)
+assert des1 is not None and des2 is not None, "特征点为 0，换图"
+print("特征点:", len(kp1), len(kp2))
+
+knn = cv2.BFMatcher(cv2.NORM_L2).knnMatch(des1, des2, k=2)
+good = [m for m, n in (p for p in knn if len(p) == 2)
+        if m.distance &lt; 0.75 * n.distance]
+print("ratio 后匹配:", len(good))
+
+pts1 = np.float32([kp1[m.queryIdx].pt for m in good])   # 图1 坐标
+pts2 = np.float32([kp2[m.trainIdx].pt for m in good])   # 图2 坐标
+</pre>
+      </div>
+
+      <p>几个记号：<code class="inline">kp[i].pt</code> 是像素坐标 (x, y)，与 <code class="inline">des[i]</code> 一一对应；<code class="inline">queryIdx</code> 属于 <code class="inline">des1</code>（图 1），<code class="inline">trainIdx</code> 属于 <code class="inline">des2</code>（图 2）。<strong>这两行写反了 RANSAC 照样收敛、不报错</strong>，但 H 方向会反，排查时优先查这里。</p>
+
+      <div class="checkpoint">
+        <span class="tag">验证点 1 · 跑一次</span>
+        <p>在 <code class="inline">hw2</code> 目录执行 <code class="inline">python stitch.py</code>，应看到两行数字（用作业 PDF 参考图实测）：</p>
+        <div class="code" style="margin-bottom:0">
+          <div class="code-bar"><span class="lang">text</span><button class="copy-btn">复制</button></div>
+          <pre data-lang="text">特征点: 4020 3143
+ratio 后匹配: 1029</pre>
+        </div>
+        <p style="margin-top:12px">数字不同没关系，只要两行都正常打印、匹配数在几百以上。若报 <em>image is empty</em>，回第 1 章查路径。</p>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section id="s3">
+      <h2><span class="num">03</span>第 2 步：DLT —— RANSAC 的内核求解器</h2>
+
+      <div class="callout warn">
+        <span class="tag">先把定位摆正</span>
+        <p>本章的 <code class="inline">dlt()</code> <strong>不是最终求 H 的方法</strong>。它只回答一个更小的子问题：<em>给定 4 对点，怎么算出一个候选 H</em>。真正的 H 由第 4 章的 RANSAC 产生 —— RANSAC 反复调用它造候选、用全部点投票、最后拿内点再调用一次。<strong>直接对全部匹配跑一次 DLT 是错的</strong>，原因见 4.1。</p>
+      </div>
+
+      <h3>3.1 H 从哪来：平面约束推出单应</h3>
+      <p>设世界平面 Π: <em>n</em><sup>T</sup><em>X</em> = <em>d</em>（<em>n</em> 为法向，<em>d</em> 为相机到平面距离）。取相机 1 为参考系，两次成像为：</p>
+      <ol class="deriv">
+        <li>相机 1：λ<sub>1</sub><em>x</em><sub>1</sub> = <em>K</em><sub>1</sub><em>X</em>；相机 2：λ<sub>2</sub><em>x</em><sub>2</sub> = <em>K</em><sub>2</sub>(<em>RX</em> + <em>t</em>)。<em>K</em> 是 3×3 内参，<em>x</em> 是齐次像素坐标，λ 是深度尺度。</li>
+        <li>由 <em>n</em><sup>T</sup><em>X</em>/<em>d</em> = 1，可把平移项改写为 <em>t</em> = <em>t</em>(<em>n</em><sup>T</sup><em>X</em>/<em>d</em>) = (<em>tn</em><sup>T</sup>/<em>d</em>)<em>X</em>，于是 <em>t</em> 从"加数"变成"矩阵乘在 X 上"。</li>
+        <li>代回：λ<sub>2</sub><em>x</em><sub>2</sub> = <em>K</em><sub>2</sub>(<em>R</em> + <em>tn</em><sup>T</sup>/<em>d</em>)<em>X</em> = <em>K</em><sub>2</sub>(<em>R</em> + <em>tn</em><sup>T</sup>/<em>d</em>)<em>K</em><sub>1</sub><sup>−1</sup>(λ<sub>1</sub><em>x</em><sub>1</sub>)。</li>
+        <li>去掉两边深度尺度 λ，得 <em>x</em><sub>2</sub> ~ <em>Hx</em><sub>1</sub>，其中</li>
+      </ol>
+      <div class="eq">
+        <span class="var">H</span> = <span class="var">K</span><sub>2</sub> ( <span class="var">R</span> + <span class="var">tn</span><sup>T</sup>/<span class="var">d</span> ) <span class="var">K</span><sub>1</sub><sup>−1</sup>
+        <span class="note">加减号随 t 的定义方向而变，不影响"存在 3×3 线性映射"这一结论</span>
+      </div>
+      <p>三条有用推论：<strong>H 与平面上的图案无关</strong>（只由内参、姿态、平面位置决定）；纯旋转时 <em>t</em>=0，<em>H</em>=<em>K</em><sub>2</sub><em>RK</em><sub>1</sub><sup>−1</sup> 与深度无关（手机原地转头拍全景能无缝拼接）；有平移且场景有纵深时，不同深度对应不同 H，全局单应就会失败——<strong>所以校牌能拼、整栋楼不能</strong>。</p>
+
+      <h3>3.2 齐次坐标、8 自由度、最少 4 对点</h3>
+      <p>点 (<em>x</em>, <em>y</em>) 写成 [<em>x</em>, <em>y</em>, 1]<sup>T</sup>，它表示一条射线：任意 λ≠0，[λ<em>x</em>, λ<em>y</em>, λ]<sup>T</sup> 是同一个点。因此：</p>
+      <div class="eq">
+        <span class="matrix">
+          <span><span class="var">x</span>′</span><span><span class="var">y</span>′</span><span>1</span>
+        </span>
+        ~
+        <span class="matrix">
+          <span><span class="var">h</span><sub>11</sub></span><span><span class="var">h</span><sub>12</sub></span><span><span class="var">h</span><sub>13</sub></span>
+          <span><span class="var">h</span><sub>21</sub></span><span><span class="var">h</span><sub>22</sub></span><span><span class="var">h</span><sub>23</sub></span>
+          <span><span class="var">h</span><sub>31</sub></span><span><span class="var">h</span><sub>32</sub></span><span><span class="var">h</span><sub>33</sub></span>
+        </span>
+        <span class="matrix"><span><span class="var">x</span></span><span><span class="var">y</span></span><span>1</span></span>
+        <span class="note">"~" 表示相差一个尺度因子。H 与 λH 作用结果完全相同 → 9 个元素只有 <strong>8 个自由度</strong></span>
+      </div>
+      <p>把 <em>h</em><sub>33</sub> 固定为 1 后，<em>h</em> 有 8 个未知数；每对匹配点提供 2 个独立方程（下面推），所以 <strong>8 ÷ 2 = 4 对点</strong>是最少样本。4 对是"恰定"（只能求零空间），有噪声时要用更多点做最小二乘——这正是第 4 步 RANSAC 最后用全部内点重算的理由。</p>
+
+      <h3>3.3 DLT：把投影式线性化为 Ah = 0</h3>
+      <p>设 <em>h</em> = [<em>h</em><sub>11</sub> <em>h</em><sub>12</sub> <em>h</em><sub>13</sub> <em>h</em><sub>21</sub> <em>h</em><sub>22</sub> <em>h</em><sub>23</sub> <em>h</em><sub>31</sub> <em>h</em><sub>32</sub> <em>h</em><sub>33</sub>]<sup>T</sup>，一对点 (<em>x</em>, <em>y</em>) ↔ (<em>u</em>, <em>v</em>)。</p>
+      <ol class="deriv">
+        <li>展开齐次式，记 <em>w</em> = <em>h</em><sub>31</sub><em>x</em> + <em>h</em><sub>32</sub><em>y</em> + <em>h</em><sub>33</sub>：
+          <div class="eq" style="margin:12px 0">
+            <span class="var">u</span> = <span class="frac"><span class="num"><span class="var">h</span><sub>11</sub><span class="var">x</span> + <span class="var">h</span><sub>12</sub><span class="var">y</span> + <span class="var">h</span><sub>13</sub></span><span class="den"><span class="var">w</span></span></span>
+            ,&nbsp;
+            <span class="var">v</span> = <span class="frac"><span class="num"><span class="var">h</span><sub>21</sub><span class="var">x</span> + <span class="var">h</span><sub>22</sub><span class="var">y</span> + <span class="var">h</span><sub>23</sub></span><span class="den"><span class="var">w</span></span></span>
+          </div>
+        </li>
+        <li>交叉相乘消去 <em>w</em>：
+          <div class="eq" style="margin:12px 0">
+            <span class="var">u</span>(<span class="var">h</span><sub>31</sub><span class="var">x</span> + <span class="var">h</span><sub>32</sub><span class="var">y</span> + <span class="var">h</span><sub>33</sub>) − (<span class="var">h</span><sub>11</sub><span class="var">x</span> + <span class="var">h</span><sub>12</sub><span class="var">y</span> + <span class="var">h</span><sub>13</sub>) = 0
+          </div>
+        </li>
+        <li>按 <em>h</em> 的分量整理成行向量内积，并对 <em>v</em> 同理，得到两个线性方程：
+          <div class="code" style="margin:12px 0">
+            <div class="code-bar"><span class="lang">text</span><button class="copy-btn">复制</button></div>
+            <pre data-lang="text">[  x,  y,  1,  0,  0,  0, -u·x, -u·y, -u ] · h = 0
+[  0,  0,  0,  x,  y,  1, -v·x, -v·y, -v ] · h = 0</pre>
+          </div>
+        </li>
+        <li>两行同乘 −1 不改变方程，就得到代码里 A 的那两行：
+          <div class="code" style="margin:12px 0">
+            <div class="code-bar"><span class="lang">text</span><button class="copy-btn">复制</button></div>
+            <pre data-lang="text">[ -x, -y, -1,   0,   0,   0,  u·x, u·y, u ]
+[   0,  0,  0,  -x,  -y,  -1,  v·x, v·y, v ]</pre>
+          </div>
+        </li>
+        <li>N 对点堆起来就是 <em>A</em><sub>2N×9</sub> <em>h</em><sub>9×1</sub> = 0；4 对点时 A 是 8×9。</li>
+      </ol>
+
+      <h3>3.4 SVD 为什么取 Vt[-1]</h3>
+      <p>要找<strong>非零</strong>的 <em>h</em> 使 <em>Ah</em> ≈ 0，必须加尺度约束排除平凡解 <em>h</em>=0：</p>
+      <div class="eq">
+        min ‖<span class="var">Ah</span>‖<sup>2</sup> &nbsp; s.t. &nbsp; ‖<span class="var">h</span>‖ = 1
+      </div>
+      <ol class="deriv">
+        <li>对 A 做 SVD：<em>A</em> = <em>U</em>Σ<em>V</em><sup>T</sup>，其中 σ<sub>1</sub> ≥ ⋯ ≥ σ<sub>9</sub> ≥ 0。</li>
+        <li>令 <em>y</em> = <em>V</em><sup>T</sup><em>h</em>。因 <em>V</em>、<em>U</em> 正交，‖<em>y</em>‖ = ‖<em>h</em>‖ = 1，且 ‖<em>Ah</em>‖<sup>2</sup> = ‖<em>U</em>Σ<em>y</em>‖<sup>2</sup> = ‖Σ<em>y</em>‖<sup>2</sup>。</li>
+        <li>展开：‖Σ<em>y</em>‖<sup>2</sup> = σ<sub>1</sub><sup>2</sup><em>y</em><sub>1</sub><sup>2</sup> + ⋯ + σ<sub>9</sub><sup>2</sup><em>y</em><sub>9</sub><sup>2</sup>。在 ‖<em>y</em>‖=1 下使其最小，应把全部"质量"放在系数最小的 σ<sub>9</sub> 项，即 <em>y</em> = (0,…,0,1)<sup>T</sup>，最小值为 σ<sub>9</sub><sup>2</sup>。</li>
+        <li>于是 <em>h</em> = <em>V y</em> = <em>V</em> 的最后一列 = <em>V</em><sup>T</sup> 的最后一行，即 <code>Vt[-1]</code>；<code class="inline">reshape(3,3)</code> 后再除以 <em>h</em><sub>33</sub> 归一化。</li>
+      </ol>
+      <div class="callout warn">
+        <span class="tag">API 坑</span>
+        <p><code class="inline">np.linalg.svd(A)</code> 第三个返回值<strong>已经是 V<sup>T</sup></strong>，所以是 <code class="inline">Vt[-1]</code>，不要再 <code class="inline">.T</code>，也不要写成 <code class="inline">Vt[:, -1]</code>。写错不报错，只会让结果悄悄错掉。</p>
+      </div>
+
+      <h3>3.5 Hartley 归一化与反归一化</h3>
+      <p>像素坐标约 10³，A 里同时有 1、<em>x</em>≈10³、<em>u·x</em>≈10⁶，跨 6 个数量级，SVD 条件数极差，解会系统性偏向大坐标那一侧。先把两组点各自移到质心、各向同性缩放到平均距离 √2：</p>
+      <div class="eq">
+        <span class="var">c</span> = <span class="frac"><span class="num">1</span><span class="den"><span class="var">N</span></span></span> Σ<span class="var">p</span><sub>i</sub> ,&nbsp;
+        <span class="var">d̄</span> = <span class="frac"><span class="num">1</span><span class="den"><span class="var">N</span></span></span> Σ‖<span class="var">p</span><sub>i</sub> − <span class="var">c</span>‖ ,&nbsp;
+        <span class="var">s</span> = <span class="frac"><span class="num">√2</span><span class="den"><span class="var">d̄</span></span></span>
+        <span class="note">s 的选择让归一化后点的平均欧氏距离约等于 √2，A 各列量级拉回同一水平</span>
+      </div>
+      <div class="eq">
+        <span class="var">T</span> =
+        <span class="matrix">
+          <span><span class="var">s</span></span><span>0</span><span>−<span class="var">sc</span><sub>x</sub></span>
+          <span>0</span><span><span class="var">s</span></span><span>−<span class="var">sc</span><sub>y</sub></span>
+          <span>0</span><span>0</span><span>1</span>
+        </span>
+        ,&nbsp; <span class="var">p̃</span> = <span class="var">T p</span>
+      </div>
+      <p>在归一化坐标下解出 H̃ 后必须还原。推导四步：</p>
+      <ol class="deriv">
+        <li><em>p̃</em><sub>1</sub> = <em>T</em><sub>1</sub><em>p</em><sub>1</sub>，<em>p̃</em><sub>2</sub> = <em>T</em><sub>2</sub><em>p</em><sub>2</sub>；解出 <em>p̃</em><sub>2</sub> ~ <em>H̃ p̃</em><sub>1</sub>。</li>
+        <li>代入得 <em>T</em><sub>2</sub><em>p</em><sub>2</sub> ~ <em>H̃ T</em><sub>1</sub><em>p</em><sub>1</sub>。</li>
+        <li>左乘 <em>T</em><sub>2</sub><sup>−1</sup>：<em>p</em><sub>2</sub> ~ <em>T</em><sub>2</sub><sup>−1</sup><em>H̃ T</em><sub>1</sub><em>p</em><sub>1</sub>。</li>
+        <li>所以 <strong><em>H</em> = <em>T</em><sub>2</sub><sup>−1</sup> <em>H̃</em> <em>T</em><sub>1</sub></strong>。T<sub>1</sub> 作用在输入端，原样留在最右；T<sub>2</sub> 作用在输出端，取逆放最左。</li>
+      </ol>
+
+      <h3>3.6 一句话说明 DLT 的局限（报告可写）</h3>
+      <p>DLT 最小化的 <code class="inline">‖Ah‖</code> 是<strong>代数误差</strong>，没有直接的像素含义；理想目标是<strong>几何误差</strong> Σ‖<em>q</em><sub>i</sub> − π(<em>Hp</em><sub>i</sub>)‖<sup>2</sup>，它关于 H 非线性，严格解需以 DLT 为初值做 LM 迭代。作业用"RANSAC 挑净内点 + 全部内点重算 DLT"已能把误差压到 1~2 像素，不必实现 LM。</p>
+
+      <h3>3.7 动手：把这三个函数追加到文件末尾</h3>
+
+      <div class="code">
+        <div class="code-bar"><span class="lang">python</span><span class="name">第 2 段 · 追加到 stitch.py</span><span class="hint">约 30 行</span><button class="copy-btn">复制</button></div>
+        <pre data-lang="python" data-build="1">
+def normalize_points(pts):
+    pts = np.asarray(pts, dtype=np.float64)
+    c = pts.mean(axis=0)
+    d = np.sqrt(((pts - c) ** 2).sum(axis=1)).mean()
+    s = np.sqrt(2.0) / d if d &gt; 1e-12 else 1.0
+    T = np.array([[s, 0, -s * c[0]],
+                  [0, s, -s * c[1]],
+                  [0, 0, 1.0]])
+    h = np.hstack([pts, np.ones((len(pts), 1))])
+    return ((T @ h.T).T)[:, :2], T
+
+
+def dlt(pts1, pts2):
+    p1, T1 = normalize_points(pts1)
+    p2, T2 = normalize_points(pts2)
+    A = []
+    for (x, y), (u, v) in zip(p1, p2):
+        A.append([-x, -y, -1, 0, 0, 0, x * u, y * u, u])
+        A.append([0, 0, 0, -x, -y, -1, x * v, y * v, v])
+    _, _, Vt = np.linalg.svd(np.asarray(A, dtype=np.float64))
+    H = np.linalg.inv(T2) @ Vt[-1].reshape(3, 3) @ T1
+    return H / H[2, 2]
+
+
+def apply_h(H, pts):
+    pts = np.asarray(pts, dtype=np.float64)
+    h = np.hstack([pts, np.ones((len(pts), 1))])
+    q = (H @ h.T).T
+    w = q[:, 2:3].copy()
+    w[np.abs(w) &lt; 1e-12] = 1e-12
+    return q[:, :2] / w
+</pre>
+      </div>
+
+      <p>对照推导看：<code class="inline">A.append</code> 两行 = 3.3 的第 (4) 步；<code class="inline">Vt[-1]</code> = 3.4 第 (4) 步；<code class="inline">inv(T2) @ ... @ T1</code> = 3.5 第 (4) 步；<code class="inline">apply_h</code> 里除以 <em>w</em> 就是 3.3 第 (1) 步的分母。</p>
+
+      <div class="checkpoint">
+        <span class="tag">验证点 2 · 用已知 H 造 4 对点</span>
+        <p>另开一个临时脚本（<strong>别写进 stitch.py</strong>），或在 <code class="inline">stitch.py</code> 末尾临时粘这几行跑完再删：</p>
+        <div class="code">
+          <div class="code-bar"><span class="lang">python</span><button class="copy-btn">复制</button></div>
+          <pre data-lang="python">H_true = np.array([[1.10, 0.05, 30.0],
+                   [-0.02, 0.95, -20.0],
+                   [0.0001, 0.0002, 1.0]])
+p = np.float32([[10, 10], [200, 30], [180, 260], [25, 240]])
+q = apply_h(H_true, p)
+H_est = dlt(p, q)
+print("4 点重投影最大误差:", np.abs(apply_h(H_est, p) - q).max())</pre>
+        </div>
+        <p>应该打印一个 <strong>小于 1e-6</strong> 的数（本机实测 5.7×10<sup>−14</sup>）。若误差很大，多半是 A 的两行系数抄错，或反归一化顺序写反了。<strong>这一步过了，DLT 就写对了。</strong></p>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section id="s4">
+      <h2><span class="num">04</span>第 3 步：用 RANSAC 求最终 H（核心）</h2>
+
+      <h3>4.1 为什么是 RANSAC，而不是直接 DLT</h3>
+      <p>这是本作业最该讲清楚的一点。第 1 步留下的约 1000 对匹配里通常有 20%~40%（甚至更多）是错的，而 DLT 是<strong>最小二乘</strong>：它只会给出一个解，并尽量让<em>所有</em>点的残差平方和最小，<strong>对离群点毫无抵抗力</strong>。一对错匹配的残差可能上千像素，平方后直接主导目标函数，H 被拉到"谁也不太像"的折中位置。</p>
+      <p>具体到你的数据：4020 个查询点经 ratio 过滤剩 1029 对，实测内点只有 528 对（51.3%），剩下 501 对是错的。<strong>把这 1029 对一次性喂给 <code class="inline">dlt()</code></strong>，结果必然偏离正确解；而 RANSAC 每次只用 4 对造假设，只要有一轮抽样凑巧全是内点，就能投出正确的 H。</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>直接 DLT（全部点）</th><th>RANSAC + DLT（本作业）</th></tr></thead>
+          <tbody>
+            <tr><td>输入</td><td>1029 对，其中 501 对错误</td><td>每轮随机 4 对，共 3000 轮</td></tr>
+            <tr><td>对离群点</td><td>残差平方后主导结果</td><td>被投票判为外点，不参与建模</td></tr>
+            <tr><td>鲁棒性</td><td>无，必须内点接近 100%</td><td>内点率 50% 仍可靠</td></tr>
+            <tr><td>输出</td><td>一个偏掉的 H</td><td>最优假设 + 内点集 + 精化后的 H</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>所以两者的关系是<strong>外层与内层</strong>：RANSAC 决定"用哪些点、迭代多少次、取哪个模型"，DLT 只负责"给 4 对点解出 H"这个动作。最终交付的 H，是<strong>最后用全部内点重算</strong>的那一个，而不是任何一次 4 点解。</p>
+
+      <h3>4.2 重投影误差</h3>
+      <p>把图 1 的点用候选 H 投到图 2，与实际对应点比距离，单位是像素：</p>
+      <div class="eq">
+        <span class="var">e</span><sub>i</sub> = ‖ π( <span class="var">H p</span><sub>i</sub> ) − <span class="var">q</span><sub>i</sub> ‖<sub>2</sub> ,&nbsp;&nbsp;
+        <span class="var">e</span><sub>i</sub> &lt; τ → 内点 ,&nbsp; τ = 4 px
+        <span class="note">π(·) = 齐次坐标除第三分量取回像素坐标，就是 <code>apply_h</code></span>
+      </div>
+
+      <h3>4.3 迭代次数公式（报告常考）</h3>
+      <p>设内点比例为 <em>w</em>，每次抽 4 对点，置信度目标 <em>p</em>（常取 0.99 或 0.995）。</p>
+      <ol class="deriv">
+        <li>一次抽样中 4 个点<strong>全是内点</strong>的概率 ≈ <em>w</em><sup>4</sup>（不放回抽样的严格值略小，作业用 <em>w</em><sup>4</sup> 即可）。</li>
+        <li>一次抽样<strong>失败</strong>（至少掺了一个外点）的概率 = 1 − <em>w</em><sup>4</sup>。</li>
+        <li>N 次独立抽样<strong>全部失败</strong>的概率 = (1 − <em>w</em><sup>4</sup>)<sup>N</sup>。要求它以置信度 <em>p</em> 不发生，即 (1 − <em>w</em><sup>4</sup>)<sup>N</sup> ≤ 1 − <em>p</em>。</li>
+        <li>两边取对数：<em>N</em> ln(1 − <em>w</em><sup>4</sup>) ≤ ln(1 − <em>p</em>)。<strong>注意 ln(1 − w⁴) &lt; 0，除过去不等号反向</strong>：</li>
+      </ol>
+      <div class="eq">
+        <span class="var">N</span> ≥
+        <span class="frac"><span class="num">ln(1 − <span class="var">p</span>)</span><span class="den">ln(1 − <span class="var">w</span><sup>4</sup>)</span></span>
+        <span class="note">p = 0.995 时：w = 0.3 → 约 1150 次；w = 0.6 → 约 35 次。内点越多，需要迭代越少</span>
+      </div>
+      <p>写代码时先固定 3000 次（几秒跑完）完全够交；把上式写成几行按 <em>w</em> 动态更新循环上限就是加分项。<strong>报告里要把上面四步推导写出来。</strong></p>
+
+      <h3>4.4 算法四步</h3>
+      <ol class="steps">
+        <li>随机抽 4 对（任意三点共线就重抽，否则 A 秩亏、DLT 无解）。</li>
+        <li>用这 4 对跑 <code class="inline">dlt()</code> 得到候选 H。</li>
+        <li>用 <code class="inline">apply_h()</code> 算全部点的 <em>e</em><sub>i</sub>，统计内点数；刷新最优就保存 H 与内点掩码。</li>
+        <li>迭代结束后<strong>用全部内点重跑一次 DLT</strong>，再重新统计内点。</li>
+      </ol>
+      <div class="callout warn">
+        <span class="tag">第 4 步不能省</span>
+        <p>4 对点解出的 H 只是"够用来挑内点"，精度远不如几百个内点做最小二乘。少了这步，拼接接缝会明显错位——评分最容易扣这里。</p>
+      </div>
+
+      <h3>4.5 动手：把 ransac 与调用追加到文件末尾</h3>
+
+      <div class="code">
+        <div class="code-bar"><span class="lang">python</span><span class="name">第 3 段 · 追加到 stitch.py</span><span class="hint">约 30 行</span><button class="copy-btn">复制</button></div>
+        <pre data-lang="python" data-build="1">
+def ransac(pts1, pts2, thresh=4.0, max_iter=3000, seed=0):
+    rng = np.random.default_rng(seed)
+    n = len(pts1)
+    best_H, best_mask, best_cnt = None, np.zeros(n, bool), 0
+
+    for _ in range(max_iter):
+        idx = rng.choice(n, 4, replace=False)
+
+        # 任意三点共线 → A 秩亏，重抽
+        ok = True
+        for a, b, c in [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]:
+            v1 = pts1[idx[b]] - pts1[idx[a]]
+            v2 = pts1[idx[c]] - pts1[idx[a]]
+            if abs(v1[0] * v2[1] - v1[1] * v2[0]) &lt; 1.0:
+                ok = False
+                break
+        if not ok:
+            continue
+
+        H = dlt(pts1[idx], pts2[idx])
+        err = np.linalg.norm(apply_h(H, pts1) - pts2, axis=1)
+        mask = err &lt; thresh
+        if mask.sum() &gt; best_cnt:
+            best_cnt, best_mask, best_H = int(mask.sum()), mask, H
+
+    if best_cnt &lt; 10:
+        return None, best_mask
+
+    # 用全部内点重算（对应 4.4 第 4 步）
+    H = dlt(pts1[best_mask], pts2[best_mask])
+    mask = np.linalg.norm(apply_h(H, pts1) - pts2, axis=1) &lt; thresh
+    return H, mask
+
+
+H, mask = ransac(pts1, pts2)
+assert H is not None, "RANSAC 失败，内点不足"
+print("内点率: %d/%d = %.1f%%" % (mask.sum(), len(mask), 100 * mask.mean()))
+print("H =")
+print(np.round(H, 6))
+</pre>
+      </div>
+
+      <div class="checkpoint">
+        <span class="tag">验证点 3 · 跑一次</span>
+        <p>执行 <code class="inline">python stitch.py</code>，在前面两行数字之后应多出内点率与 H（实测）：</p>
+        <div class="code" style="margin-bottom:0">
+          <div class="code-bar"><span class="lang">text</span><button class="copy-btn">复制</button></div>
+          <pre data-lang="text">特征点: 4020 3143
+ratio 后匹配: 1029
+内点率: 528/1029 = 51.3%
+H =
+[[ 9.038570e-01 -7.345900e-02  8.051457e+01]
+ [-4.316600e-02  8.340110e-01  4.465371e+02]
+ [-3.700000e-05 -1.250000e-04  1.000000e+00]]</pre>
+        </div>
+        <p style="margin-top:12px">内点率 <strong>50%~85%</strong>、<code class="inline">H[2,2] = 1</code> 即通过。固定 <code class="inline">seed=0</code> 保证每次结果一致，方便截图。</p>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section id="s5">
+      <h2><span class="num">05</span>第 4 步：拼接与平滑融合</h2>
+
+      <h3>5.1 原理：包围盒与平移矩阵</h3>
+      <p><code class="inline">warpPerspective</code> 能把图 1 变换到图 2 的视角，但变换后四角可能落到<strong>负坐标</strong>，按原尺寸输出会被裁掉。做法：</p>
+      <ol class="deriv">
+        <li>取图 1 四角 <em>p</em><sub>i</sub>，用 H 变换得 <em>p</em>′<sub>i</sub> = π(<em>Hp</em><sub>i</sub>)；与图 2 四角合并求包围盒 [<em>x</em><sub>min</sub>, <em>x</em><sub>max</sub>] × [<em>y</em><sub>min</sub>, <em>y</em><sub>max</sub>]。</li>
+        <li>画布尺寸 <em>o</em><sub>w</sub> = <em>x</em><sub>max</sub> − <em>x</em><sub>min</sub>，<em>o</em><sub>h</sub> = <em>y</em><sub>max</sub> − <em>y</em><sub>min</sub>；构造平移矩阵把包围盒左上角挪到原点：</li>
+      </ol>
+      <div class="eq">
+        <span class="var">T</span> =
+        <span class="matrix">
+          <span>1</span><span>0</span><span>−<span class="var">x</span><sub>min</sub></span>
+          <span>0</span><span>1</span><span>−<span class="var">y</span><sub>min</sub></span>
+          <span>0</span><span>0</span><span>1</span>
+        </span>
+        ,&nbsp; <span class="var">M</span> = <span class="var">T H</span> ,&nbsp;
+        <code>warpPerspective(img1, M, (o_w, o_h))</code>
+      </div>
+      <p>图 2 保持不动，它在画布中的原点是 (−<em>x</em><sub>min</sub>, −<em>y</em><sub>min</sub>)，贴回去即可（代码里做了裁剪保护，防止越界）。</p>
+
+      <div class="callout">
+        <span class="tag">H 的方向</span>
+        <p>用 <code class="inline">pts1 → pts2</code> 解出的 H 是「<strong>图 1 → 图 2</strong>」，所以变换图 1、把图 2 当基准。若画布尺寸异常巨大或图像跑出画面，先回 2.2 检查 <code class="inline">queryIdx</code>/<code class="inline">trainIdx</code> 是不是写反了。</p>
+      </div>
+
+      <h3>5.2 平滑过渡：距离变换羽化</h3>
+
+      <p>直接把图 2 贴到画布上，接缝处会有一条<strong>硬边</strong>：两张照片的曝光、白平衡、镜头暗角都不可能完全一致，边界两侧出现亮度突变，人眼对这种台阶极敏感。做法是在<strong>重叠区</strong>把两张图按权重混合，让过渡带逐渐变化。</p>
+
+      <p>权重怎么定？核心想法是：<strong>离自己图像边界越远，这一侧的像素越可信</strong>（没有被裁切、暗角最轻）。用<strong>距离变换</strong>算出每个有效像素到本图边界的欧氏距离 <em>d</em><sub>1</sub>、<em>d</em><sub>2</sub>，再归一化：</p>
+
+      <div class="eq">
+        <span class="var">w</span><sub>1</sub>(<span class="var">x</span>) =
+        <span class="frac">
+          <span class="num"><span class="var">d</span><sub>1</sub>(<span class="var">x</span>)</span>
+          <span class="den"><span class="var">d</span><sub>1</sub>(<span class="var">x</span>) + <span class="var">d</span><sub>2</sub>(<span class="var">x</span>)</span>
+        </span>
+        ,&nbsp;&nbsp; <span class="var">w</span><sub>2</sub> = 1 − <span class="var">w</span><sub>1</sub>
+        <span class="note">融合结果：<em>I</em>(<em>x</em>) = <em>w</em><sub>1</sub><em>I</em><sub>1</sub>(<em>x</em>) + <em>w</em><sub>2</sub><em>I</em><sub>2</sub>(<em>x</em>)</span>
+      </div>
+
+      <p>这个式子有三个好处，正好对应实现里的三行代码：</p>
+      <ul>
+        <li><strong>重叠区中心</strong>：两张图离各自边界都远，<em>w</em><sub>1</sub>≈<em>w</em><sub>2</sub>≈0.5，均匀混合，看不出接缝。</li>
+        <li><strong>靠近接缝外侧</strong>：某一张的 <em>d</em> 趋近 0，它的权重也趋近 0，像素完全由另一张决定，不会出现"半透明的鬼影边"。</li>
+        <li><strong>非重叠区</strong>：只有一张图覆盖，另一张 <em>d</em>=0，权重自动退化为 1 和 0，也就是原样保留。</li>
+      </ul>
+
+      <p>实现上就是两次 <code class="inline">cv2.distanceTransform(mask, cv2.DIST_L2, 3)</code>：把两张图各自的覆盖区域做成 0/255 掩码，距离变换后得到"离边界多少像素"的浮点图，相除即得权重。它比"按 x 方向做线性渐变"更通用 —— 不管重叠区是什么形状（倾斜、L 形、被裁掉一角），权重都是自洽的。</p>
+
+      <div class="callout warn">
+        <span class="tag">重要限制</span>
+        <p>羽化只能消除<strong>亮度</strong>的突变，<strong>不能修复几何错位</strong>。如果 H 不够准、两张图对不齐，融合出来的不是"平滑"，而是<strong>半透明重影</strong>——文字会出现双重轮廓。看到重影不要再调融合参数，回去查内点率、τ 和是否做了内点重算。</p>
+      </div>
+
+      <h3>5.3 动手：最后一段，追加到文件末尾</h3>
+
+      <div class="code">
+        <div class="code-bar"><span class="lang">python</span><span class="name">第 4 段 · 追加到 stitch.py</span><span class="hint">约 40 行（含羽化融合）</span><button class="copy-btn">复制</button></div>
+        <pre data-lang="python" data-build="1">
+def stitch(img1, img2, H):
+    h1, w1 = img1.shape[:2]
+    h2, w2 = img2.shape[:2]
+
+    # 包围盒：图1 四角经 H 变换后，与图2 四角求并集
+    c1 = np.float32([[0, 0], [w1, 0], [w1, h1], [0, h1]]).reshape(-1, 1, 2)
+    warped = cv2.perspectiveTransform(c1, H).reshape(-1, 2)
+    c2 = np.float32([[0, 0], [w2, 0], [w2, h2], [0, h2]])
+    allc = np.vstack([warped, c2])
+    xmin, ymin = np.floor(allc.min(axis=0)).astype(int)
+    xmax, ymax = np.ceil(allc.max(axis=0)).astype(int)
+    ow, oh = int(xmax - xmin), int(ymax - ymin)
+
+    T = np.array([[1, 0, -xmin], [0, 1, -ymin], [0, 0, 1]], np.float64)
+    M = T @ H
+
+    # 图1：变换到画布，同时得到它的有效区域掩码
+    canvas1 = cv2.warpPerspective(img1, M, (ow, oh))
+    mask1 = cv2.warpPerspective(np.full((h1, w1), 255, np.uint8), M, (ow, oh),
+                                flags=cv2.INTER_NEAREST)
+
+    # 图2：平移到画布（其余区域为 0），同样生成掩码
+    canvas2 = np.zeros_like(canvas1)
+    mask2 = np.zeros((oh, ow), np.uint8)
+    ox, oy = -xmin, -ymin
+    x0, y0 = max(ox, 0), max(oy, 0)
+    x1, y1 = min(ox + w2, ow), min(oy + h2, oh)
+    if x1 &gt; x0 and y1 &gt; y0:
+        canvas2[y0:y1, x0:x1] = img2[y0 - oy:y1 - oy, x0 - ox:x1 - ox]
+        mask2[y0:y1, x0:x1] = 255
+
+    # 距离变换 → 羽化权重：离接缝越远，这一侧越可信
+    d1 = cv2.distanceTransform(mask1, cv2.DIST_L2, 3)
+    d2 = cv2.distanceTransform(mask2, cv2.DIST_L2, 3)
+    total = d1 + d2 + 1e-6
+    a1 = (d1 / total)[..., None]
+    a2 = (d2 / total)[..., None]
+
+    out = canvas1.astype(np.float32) * a1 + canvas2.astype(np.float32) * a2
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+OUT = os.path.join(BASE, "out")
+os.makedirs(OUT, exist_ok=True)
+inliers = [good[i] for i in np.where(mask)[0]]
+cv2.imwrite(os.path.join(OUT, "inliers.png"),
+            cv2.drawMatches(img1, kp1, img2, kp2, inliers, None,
+                            matchColor=(0, 200, 0),
+                            flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS))
+cv2.imwrite(os.path.join(OUT, "stitched.jpg"), stitch(img1, img2, H))
+print("完成 -&gt; out/inliers.png, out/stitched.jpg")
+</pre>
+      </div>
+
+      <p>为什么用两次 <code class="inline">warpPerspective</code> 而不是"变换一张、再覆盖贴另一张"：融合必须拿到两侧各自的<strong>有效区域掩码</strong>才能算距离变换；覆盖贴图没有掩码，只能得到硬边。多出来的开销只是一次最近邻 warp 和两次距离变换，几千万像素也就几十毫秒。</p>
+
+      <div class="callout">
+        <span class="tag">四角的黑色不是 bug</span>
+        <p>透视变换后的图 1 是一个<strong>任意四边形</strong>，而画布取的是它的外接矩形，所以四角必然出现"两张图都没覆盖"的空隙，这些像素输出为 0（黑）。本机实测这块占整幅约 8%，视角越倾斜占比越大。这是拼接图的正常外观，不是融合失败；截图觉得难看就按有效区域裁剪一次。</p>
+      </div>
+
+      <div class="checkpoint">
+        <span class="tag">验证点 4 · 收工</span>
+        <p>再跑一次 <code class="inline">python stitch.py</code>，末尾多出 <code class="inline">完成 -&gt; out/inliers.png, out/stitched.jpg</code>，且 <code class="inline">out/</code> 里出现两张图。打开检查三点：</p>
+        <ul>
+          <li><strong>内点连线</strong>：大体平行、方向一致，没有满屏交叉乱线</li>
+          <li><strong>接缝亮度</strong>：两侧平滑过渡，看不到一条明显的亮/暗分界线</li>
+          <li><strong>对齐精度</strong>：校牌文字的笔画连续，没有双重轮廓。若出现重影，<strong>问题在 H 不在融合</strong>——回去查内点率、τ、以及是否做了内点重算</li>
+        </ul>
+        <p><strong>三点都过，四段代码就走完了，可以交了。</strong></p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section id="s6">
+      <h2><span class="num">06</span>调参与验收</h2>
+
+      <h3>6.1 症状对照</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>现象</th><th>原因</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td>SIFT 报 <code>image is empty</code></td><td>图没读到（cwd 不对）或 <code>des</code> 为 None</td><td>确认用 <code>__file__</code> 拼路径；降 <code>SIFT_create(contrastThreshold=0.01)</code></td></tr>
+            <tr><td>验证点 2 的四点误差很大</td><td>A 的两行系数抄错 / 反归一化顺序反了</td><td>对照 3.3 第 (4) 步与 3.5 第 (4) 步</td></tr>
+            <tr><td>内点率 &lt; 40%</td><td>视角差太大 / 匹配质量差</td><td>ratio 收紧到 0.7；换角度更接近的照片</td></tr>
+            <tr><td>内点率很高但接缝错位</td><td>τ 太大，或忘了内点重算</td><td>τ 降到 2~3；检查 <code>ransac()</code> 最后两行</td></tr>
+            <tr><td>接缝有一条明显的硬边</td><td>没做融合，直接覆盖贴图</td><td>按 5.2 做距离变换羽化；确认 <code>mask1</code>/<code>mask2</code> 非空</td></tr>
+            <tr><td>接缝处出现半透明重影</td><td>H 不准，对齐误差被羽化摊开</td><td>不是融合参数的问题：回查内点率、τ、内点重算</td></tr>
+            <tr><td>图像跑到画布外 / 尺寸巨大</td><td><code>queryIdx</code>/<code>trainIdx</code> 反了</td><td>对照 2.2 逐行检查</td></tr>
+            <tr><td>每次结果不一样</td><td>没固定随机种子</td><td><code>default_rng(0)</code></td></tr>
+            <tr><td>RANSAC 失败（内点不足）</td><td>ratio 卡太严，两图重叠太少</td><td>放宽到 0.8；确认拍的是同一块牌子</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>6.2 提交前自查</h3>
+      <ol>
+        <li>全文件搜索 <code class="inline">findHomography</code> / <code class="inline">Stitcher</code>，零命中。</li>
+        <li><code class="inline">python stitch.py</code> 从干净目录能一次跑通。</li>
+        <li>验证点 2 的四点误差 &lt; 1e-6；内点率 50%~85%；<code class="inline">H[2,2] == 1</code>。</li>
+        <li>把 H 作用到 pts1，重投影误差中位数小于 2 像素。</li>
+        <li>最终 H 来自 RANSAC 的<strong>内点重算</strong>，不是某一次 4 点解（看 <code class="inline">ransac()</code> 最后两行）。</li>
+        <li>接缝亮度平滑、无硬边；文字笔画连续、无双重轮廓。</li>
+        <li><code class="inline">out/inliers.png</code> 与 <code class="inline">out/stitched.jpg</code> 都存在、能打开。</li>
+      </ol>
+
+      <h3>6.3 报告里放什么</h3>
+      <ul>
+        <li>两张原图并排</li>
+        <li>ratio 过滤后的匹配连线图（可再补一张 RANSAC 内点图做对比，直观说明外点被剔除）</li>
+        <li>最终拼接结果</li>
+        <li><strong>融合前后对比</strong>：裁同一块接缝区域，"直接覆盖贴图"和"羽化融合"并排放，说明平滑过渡的作用</li>
+        <li>三个数字：特征点数、匹配对数、内点率；加上打印出的 H</li>
+        <li>一句话说明<strong>为什么用 RANSAC 而不是直接 DLT</strong>：内点率只有 51.3%，最小二乘会被约 500 对错配拉偏</li>
+        <li><strong>公式推导：照抄第 2.1、3.1~3.5、4.1~4.3、5.1~5.2，或直接用第 7 章速查表</strong></li>
+      </ul>
+    </section>
+
+    <!-- 7 -->
+    <section id="s7">
+      <h2><span class="num">07</span>公式速查（写报告用）</h2>
+      <p>下面把全教程的公式按报告顺序收在一页，写原理部分时直接抄；每条标了详细推导所在的小节。</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>公式 / 结论</th><th>含义</th><th>推导</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><em>d</em>(<em>a</em>,<em>b</em>) = ‖<em>a</em>−<em>b</em>‖<sub>2</sub></td><td>SIFT 描述子距离，128 维</td><td>2.1</td></tr>
+            <tr><td>2</td><td><em>d</em><sub>1</sub>/<em>d</em><sub>2</sub> &lt; 0.75</td><td>Lowe ratio test，剔除不唯一的特征</td><td>2.1</td></tr>
+            <tr><td>3</td><td><em>x</em><sub>2</sub> ~ <em>Hx</em><sub>1</sub>，<em>H</em> = <em>K</em><sub>2</sub>(<em>R</em> + <em>tn</em><sup>T</sup>/<em>d</em>)<em>K</em><sub>1</sub><sup>−1</sup></td><td>平面诱导单应；平面约束 <em>n</em><sup>T</sup><em>X</em>=<em>d</em></td><td>3.1</td></tr>
+            <tr><td>4</td><td><em>H</em> ≡ λ<em>H</em>，9 − 1 = 8 自由度；4 对点 × 2 方程 = 8</td><td>尺度等价与最少样本数</td><td>3.2</td></tr>
+            <tr><td>5</td><td><em>u</em> = (<em>h</em><sub>11</sub><em>x</em>+<em>h</em><sub>12</sub><em>y</em>+<em>h</em><sub>13</sub>)/<em>w</em>，<em>v</em> = (<em>h</em><sub>21</sub><em>x</em>+<em>h</em><sub>22</sub><em>y</em>+<em>h</em><sub>23</sub>)/<em>w</em><br><em>w</em> = <em>h</em><sub>31</sub><em>x</em>+<em>h</em><sub>32</sub><em>y</em>+<em>h</em><sub>33</sub></td><td>齐次投影展开</td><td>3.3 (1)</td></tr>
+            <tr><td>6</td><td>[−<em>x</em>, −<em>y</em>, −1, 0, 0, 0, <em>ux</em>, <em>uy</em>, <em>u</em>]·<em>h</em> = 0<br>[0, 0, 0, −<em>x</em>, −<em>y</em>, −1, <em>vx</em>, <em>vy</em>, <em>v</em>]·<em>h</em> = 0</td><td>DLT 的两行系数；N 对点堆成 <em>A</em><sub>2N×9</sub><em>h</em> = 0</td><td>3.3 (2)~(5)</td></tr>
+            <tr><td>7</td><td>min ‖<em>Ah</em>‖<sup>2</sup> s.t. ‖<em>h</em>‖=1 ⇒ <em>h</em> = <code>Vt[-1]</code></td><td>SVD 最小奇异值的右奇异向量</td><td>3.4</td></tr>
+            <tr><td>8</td><td><em>s</em> = √2/<em>d̄</em>，<em>T</em> = [[<em>s</em>,0,−<em>sc<sub>x</sub></em>],[0,<em>s</em>,−<em>sc<sub>y</sub></em>],[0,0,1]]</td><td>Hartley 归一化，改善条件数</td><td>3.5</td></tr>
+            <tr><td>9</td><td><em>H</em> = <em>T</em><sub>2</sub><sup>−1</sup> <em>H̃</em> <em>T</em><sub>1</sub></td><td>反归一化；最后 <em>H</em> / <em>h</em><sub>33</sub></td><td>3.5</td></tr>
+            <tr><td>10</td><td>‖<em>Ah</em>‖ 是代数误差；Σ‖<em>q</em><sub>i</sub>−π(<em>Hp</em><sub>i</sub>)‖<sup>2</sup> 是几何误差</td><td>严格最小化需 LM；作业用内点重算 DLT</td><td>3.6</td></tr>
+            <tr><td>11</td><td><em>e</em><sub>i</sub> = ‖π(<em>Hp</em><sub>i</sub>) − <em>q</em><sub>i</sub>‖<sub>2</sub> &lt; τ</td><td>RANSAC 内点判据，τ = 4 px</td><td>4.2</td></tr>
+            <tr><td>12</td><td>(1−<em>w</em><sup>4</sup>)<sup><em>N</em></sup> ≤ 1−<em>p</em> ⇒ <em>N</em> ≥ ln(1−<em>p</em>)/ln(1−<em>w</em><sup>4</sup>)</td><td>自适应迭代次数；注意 ln(1−<em>w</em><sup>4</sup>)&lt;0 时不等号反向</td><td>4.3</td></tr>
+            <tr><td>13</td><td><em>M</em> = <em>T H</em>，<em>T</em> = [[1,0,−<em>x</em><sub>min</sub>],[0,1,−<em>y</em><sub>min</sub>],[0,0,1]]</td><td>包围盒平移，避免负坐标被裁</td><td>5.1</td></tr>
+            <tr><td>14</td><td><em>w</em><sub>1</sub> = <em>d</em><sub>1</sub>/(<em>d</em><sub>1</sub>+<em>d</em><sub>2</sub>)，<em>I</em> = <em>w</em><sub>1</sub><em>I</em><sub>1</sub> + <em>w</em><sub>2</sub><em>I</em><sub>2</sub></td><td>距离变换羽化：<em>d</em> 为到各自有效区域边界的距离，实现接缝平滑过渡</td><td>5.2</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok">
+        <span class="tag">报告的一句话总结</span>
+        <p>用 SIFT 提取特征并以 ratio test 得到候选匹配；由平面诱导的单应模型把投影方程线性化为 <em>Ah</em>=0，经 Hartley 归一化后用 SVD 解出 4 点候选 H（DLT）；再<strong>用 RANSAC 反复随机采样 4 对点、以重投影误差投票选出最优假设，最后用全部内点重算得到最终 H</strong>；按包围盒平移做透视变换，并用距离变换羽化在重叠区平滑融合。全程未调用 <code class="inline">cv2.findHomography</code>。</p>
+      </div>
+    </section>
+
+    <div class="end">
+      OpenCV 课程作业 2 · 边看边做版。四段代码逐步敲入 <code>stitch.py</code>，手写部分为 <code>normalize_points / dlt / apply_h / ransac</code>；公式推导完整保留于第 2~5 章与第 7 章速查表。
+    </div>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var pyPatterns = [
+    ['com', /#[^\n]*/y],
+    ['str', /"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/y],
+    ['kw', /\b(?:def|class|return|if|elif|else|for|while|in|not|and|or|import|from|as|None|True|False|try|except|finally|with|lambda|is|raise|assert|break|continue|pass|global|yield)\b/y],
+    ['num', /\b\d+(?:\.\d+)?(?:[eE]-?\d+)?\b/y],
+    ['fn', /\b[A-Za-z_]\w*(?=\s*\()/y]
+  ];
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function highlight(src) {
+    var out = '', i = 0, buf = '';
+    function flush() { if (buf) { out += esc(buf); buf = ''; } }
+    while (i < src.length) {
+      var hit = null;
+      for (var k = 0; k < pyPatterns.length; k++) {
+        var re = pyPatterns[k][1]; re.lastIndex = i;
+        var m = re.exec(src);
+        if (m && m[0].length > 0) { hit = [pyPatterns[k][0], m[0]]; break; }
+      }
+      if (hit) { flush(); out += '<span class="t-' + hit[0] + '">' + esc(hit[1]) + '</span>'; i += hit[1].length; }
+      else { buf += src[i]; i++; }
+    }
+    flush(); return out;
+  }
+  document.querySelectorAll('pre[data-lang="python"]').forEach(function (pre) {
+    pre.innerHTML = highlight(pre.textContent);
+  });
+
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.closest('.code').querySelector('pre').textContent;
+      function done() {
+        btn.textContent = '已复制'; btn.classList.add('done');
+        setTimeout(function () { btn.textContent = '复制'; btn.classList.remove('done'); }, 1600);
+      }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { fb(text, done); });
+      } else { fb(text, done); }
+    });
+  });
+  function fb(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  var bar = document.getElementById('progress');
+  function onScroll() {
+    var h = document.documentElement, max = h.scrollHeight - h.clientHeight;
+    bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {}; links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      var a = map[en.target.id]; if (!a || !en.isIntersecting) return;
+      links.forEach(function (x) { x.classList.remove('active'); }); a.classList.add('active');
+    });
+  }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>
